@@ -67,6 +67,7 @@ import Cardano.Kuber.Utility.ScriptUtil
 import Cardano.Kuber.Utility.QueryHelper (queryUtxos, queryTxins)
 import Cardano.Kuber.Console.ConsoleWritable (ConsoleWritable(toConsoleTextNoPrefix))
 import Cardano.Kuber.Utility.DataTransformation (skeyToPaymentKeyHash, pkhToPaymentKeyHash)
+import Cardano.Kuber.Utility.WalletUtil (collateralBabbageEra)
 
 type BoolChange   = Bool
 type BoolFee = Bool
@@ -155,7 +156,7 @@ txBuilderToTxBodyIO' cInfo builder = do
 txBuilderToTxBody'::DetailedChainInfo ->  UTxO BabbageEra -> TxBuilder   -> Either FrameworkError  (TxBody BabbageEra,Tx BabbageEra )
 txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHistory )
                     (UTxO availableUtxo)
-                    (TxBuilder selections _inputs _inputRefs _outputs _collaterals validityStart validityEnd mintData extraSignatures explicitFee mChangeAddr metadata )
+                    (TxBuilder selections _inputs _inputRefs _outputs _collaterals validityStart validityEnd mintData extraSignatures explicitFee mChangeAddr metadata collateralReturnAddr)
   = do
   let network = getNetworkId  dCinfo
   meta<- if null metadata
@@ -174,13 +175,18 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
 
                     )
                   else pure []
+
+  txReturnCollateral' <- case collateralReturnAddr of
+      Nothing -> pure TxReturnCollateralNone
+      Just aie -> pure $ TxReturnCollateral collateralBabbageEra (TxOut aie (lovelaceToTxOutValue $ Lovelace 2_000_000) TxOutDatumNone ReferenceScriptNone)
+
   let mintValue = foldMap (\(TxMintData _ _ value)->value) mintData
       witnessProvidedMap = Map.fromList $ map (\(TxMintData policyId sw _)->(policyId,sw)) mintData
       txMintValue' = TxMintValue MultiAssetInBabbageEra mintValue $ BuildTxWith witnessProvidedMap
       fixedInputSum =  usedInputSum fixedInputs <> mintValue
-      fee= Lovelace 3_000_000
+      fee= Lovelace 100_000
       availableInputs = sortUtxos $ UTxO  $ Map.filterWithKey (\ tin _ -> Map.notMember tin fixedInputs) spendableUtxos
-      calculator= computeBody meta (Lovelace cpw) compulsarySignatories txMintValue'  fixedInputSum availableInputs (map fst collaterals) fixedOutputs
+      calculator= computeBody meta (Lovelace cpw) compulsarySignatories txMintValue'  fixedInputSum availableInputs (map fst collaterals) txReturnCollateral' fixedOutputs
       colalteralSignatories = Set.fromList ( map snd collaterals)
       compulsarySignatories = foldl (\acc x -> case x of
                           Left (_,TxOut a _ _ _) -> case addressInEraToPaymentKeyHash  a of
@@ -192,10 +198,10 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
     if  not requiresExUnitCalculation
       then  (
         let iteratedBalancing 0 _ = Left $ FrameworkError LibraryError "Transaction not balanced even in 7 iterations"
-            iteratedBalancing n lastFee= do 
-              case calculator fixedInputs  lastFee  of 
-                Right  v@(txBody',signatories',fee') -> 
-                  if fee' ==  lastFee 
+            iteratedBalancing n lastFee= do
+              case calculator fixedInputs  lastFee  of
+                Right  v@(txBody',signatories',fee') ->
+                  if fee' ==  lastFee
                     then pure v
                     else iteratedBalancing (n-1)  fee'
                 Left e -> Left e
@@ -203,17 +209,17 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
       )
       else (
           let iteratedBalancing 0 _ _ = Left $ FrameworkError LibraryError "Transaction not balanced even in 10 iterations"
-              iteratedBalancing n lastBody lastFee= do 
+              iteratedBalancing n lastBody lastFee= do
                 exUnits <- evaluateExUnitMap dCinfo ( UTxO availableUtxo) lastBody
                 inputs' <- usedInputs  (Map.map Right exUnits ) (Right defaultExunits)  resolvedInputs
                 calculator inputs' lastFee
-                case calculator inputs'  lastFee  of 
-                  Right  v@(txBody',signatories',fee') -> 
-                    if fee' ==  lastFee 
+                case calculator inputs'  lastFee  of
+                  Right  v@(txBody',signatories',fee') ->
+                    if fee' ==  lastFee
                       then pure v
                       else iteratedBalancing (n-1) txBody'  fee'
                   Left e -> Left e
-                      
+
           in  iteratedBalancing  10 txBody1 fee1
         )
     )
@@ -221,14 +227,14 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
 
   where
     iterateFeeCalculation 0 _ _ _ = Left $ FrameworkError LibraryError "Transaction not balanced even in 7 iterations"
-    iterateFeeCalculation n f txbody lastFee= do 
-      case f txbody  of 
-        Right  v@(txBody',signatories',fee') -> 
-          if fee' ==  lastFee 
+    iterateFeeCalculation n f txbody lastFee= do
+      case f txbody  of
+        Right  v@(txBody',signatories',fee') ->
+          if fee' ==  lastFee
             then pure v
             else iterateFeeCalculation (n-1) f txBody' fee'
         Left e -> Left e
-      
+
     selectableAddrs = foldl  (\s selection -> case selection of
             TxSelectableAddresses aies -> Set.fromList (map toShelleyAddr aies) <>s
             TxSelectableUtxos uto -> s
@@ -240,9 +246,9 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
           TxSelectableUtxos (UTxO uto) -> s <> uto
           TxSelectableTxIn tin -> foldl (\s tin -> case Map.lookup tin availableUtxo of
             Nothing -> s
-            Just any ->Map.insert tin any s  ) Map.empty tin 
+            Just any ->Map.insert tin any s  ) Map.empty tin
           TxSelectableSkey sks -> s  ) Map.empty  selections
-  
+
     respond txBody signatories = pure (txBody,makeSignedTransaction (map (toWitness txBody) $ mapMaybe (`Map.lookup` availableSkeys) $ Set.toList signatories) txBody)
     toWitness body skey = makeShelleyKeyWitness body (WitnessPaymentKey skey)
 
@@ -262,12 +268,13 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
       TxInputUnResolved TxInputReferenceScriptTxin{} -> True
       _ -> False ) _inputs
 
-    requiresExUnitCalculation = any (\case
-      TxInputResolved TxInputScriptUtxo {}-> True
-      TxInputResolved TxInputReferenceScriptUtxo{}-> True
-      TxInputUnResolved TxInputScriptTxin{} -> True
-      TxInputUnResolved TxInputReferenceScriptTxin{} -> True
-      _ -> False ) _inputs
+    requiresExUnitCalculation = False
+      -- any (\case
+      -- TxInputResolved TxInputScriptUtxo {}-> True
+      -- TxInputResolved TxInputReferenceScriptUtxo{}-> True
+      -- TxInputUnResolved TxInputScriptTxin{} -> True
+      -- TxInputUnResolved TxInputReferenceScriptTxin{} -> True
+      -- _ -> False ) _inputs
 
 
     -- unEitherExecutionUnit e= case e of
@@ -310,10 +317,10 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
           | v1 < 4 = if v2 < 4 then  v2 `compare` v1 else GT
           | v2 < 4 = LT
           | otherwise = v1 `compare` v2
-    
+
 
     getCollaterals  accum  x = case x  of
-        TxCollateralTxin txin -> accum++ (case Map.lookup txin spendableUtxos of
+        TxCollateralTxin txin -> accum++ (case Map.lookup txin availableUtxo of
           Nothing -> error "Collateral input missing in utxo map"
           Just (TxOut a v dh _) -> case addressInEraToPaymentKeyHash  a of
                                     Just pkh ->  (txin,pkh) : accum
@@ -326,7 +333,7 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
     isJust (Just x)  = True
     isJust _ = False
 
-    computeBody meta cpw signatories  txMintValue' fixedInputSum availableInputs collaterals fixedOutputs fixedInputs fee = do
+    computeBody meta cpw signatories  txMintValue' fixedInputSum availableInputs collaterals _txReturnCollateral fixedOutputs fixedInputs fee = do
       changeTxOut <-case findChange fixedOutputs of
         Nothing -> do
           changeaddr <- monadFailChangeAddr
@@ -338,7 +345,7 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
         maxChange = utxoListSum availableInputs <> startingChange
         missing = filterNegativeQuantity maxChange
         (feeUsed,changeUsed,outputs) = updateOutputs  fee change fixedOutputs
-        bodyContent allOutputs = mkBodyContent meta fixedInputs extraUtxos allOutputs collaterals txMintValue' fee
+        bodyContent allOutputs = mkBodyContent meta fixedInputs extraUtxos allOutputs collaterals _txReturnCollateral txMintValue' fee
         requiredSignatories = foldl (\acc (_,TxOut a _ _ _) -> fromMaybe acc (addressInEraToPaymentKeyHash a <&> flip Set.insert acc)) signatories  extraUtxos
         signatureCount=fromIntegral $ length requiredSignatories
       bc <- if changeUsed
@@ -383,7 +390,7 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
     totxIn  i  parsedInput = case parsedInput of
       Left (a,b) -> (i,BuildTxWith a)
       Right (e,a,b) -> (i,BuildTxWith  ( ScriptWitness ScriptWitnessForSpending a )  )
-    mkBodyContent meta fixedInputs extraUtxos outs collateral  txMintValue' fee =  bodyContent --   Debug.trace ("Body Content :\n" ++ show bodyContent) bodyContent
+    mkBodyContent meta fixedInputs extraUtxos outs collateral _txReturnCollateral txMintValue' fee =  bodyContent --   Debug.trace ("Body Content :\n" ++ show bodyContent) bodyContent
       where
       bodyContent=(TxBodyContent {
         txIns= getTxin fixedInputs extraUtxos ,
@@ -391,7 +398,7 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
         txOuts=outs,
         txInsReference =TxInsReference ReferenceTxInsScriptsInlineDatumsInBabbageEra $  Set.toList $ Set.fromList (map (\(TxInputReference a) -> a) _inputRefs) <>   referenceInputsFromScriptReference ,
         txTotalCollateral= TxTotalCollateralNone  ,
-        txReturnCollateral = TxReturnCollateralNone ,
+        txReturnCollateral = _txReturnCollateral,
         Cardano.Api.Shelley.txFee=TxFeeExplicit TxFeesExplicitInBabbageEra  fee,
         txValidityRange= (txLowerBound,txUpperBound),
         Cardano.Api.Shelley.txMetadata=meta  ,
@@ -403,6 +410,7 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam systemStart eraHis
         txUpdateProposal=TxUpdateProposalNone,
         txMintValue=txMintValue',
         txScriptValidity=TxScriptValidityNone
+          -- TxScriptValidity TxScriptValiditySupportedInBabbageEra ScriptInvalid
           })
     keyWitnesses = if null extraSignatures
                     then TxExtraKeyWitnessesNone

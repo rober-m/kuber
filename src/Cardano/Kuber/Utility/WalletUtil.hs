@@ -1,12 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Cardano.Kuber.Utility.WalletUtil where
-import Cardano.Api (SigningKey, PaymentKey, TxBody, BabbageEra, Tx, makeSignedTransaction, makeShelleyKeyWitness, ShelleyWitnessSigningKey (WitnessPaymentKey))
+import Cardano.Api (SigningKey, PaymentKey, TxBody, BabbageEra, Tx, makeSignedTransaction, makeShelleyKeyWitness, ShelleyWitnessSigningKey (WitnessPaymentKey), CardanoEra (BabbageEra), totalAndReturnCollateralSupportedInEra)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TextIO
 import System.Directory ( doesFileExist )
 import Cardano.Kuber.Data.Parsers ( parseSignKey )
 import Cardano.Kuber.Utility.ChainInfoUtil ( getWorkPath )
 import Control.Exception (try)
+import Cardano.Kuber.Error (FrameworkError(FrameworkError))
 
 
 -- readSignKey relative to CARDANO_HOME path
@@ -39,3 +40,8 @@ signTxBody txBody skeys= do
           makeSignedTransaction (map toWitness skeys) txBody
   where
     toWitness skey = makeShelleyKeyWitness txBody (WitnessPaymentKey skey) 
+
+
+collateralBabbageEra = case totalAndReturnCollateralSupportedInEra BabbageEra of
+  Nothing -> error "Cannot happen as expilictly set to BabbageEra. Workaround until 'TxTotalAndReturnCollateralInBabbageEra' is exposed."
+  Just a -> a

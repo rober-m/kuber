@@ -72,6 +72,8 @@ instance FromJSON TxBuilder where
       <*> v .:? "fee"
       <*> (v .:? "changeAddress" <&> fmap unAddressModal)
       <*> (v.:? "metadata" .!= Map.empty)
+      <*> (v .:? "collateralReturnAddress" <&> fmap unAddressModal)
+
   parseJSON _ = fail "TxBuilder must be an object"
 
 instance FromJSON TxMintData where
@@ -188,7 +190,7 @@ instance IsString a =>  MonadFail (Either a ) where
   fail msg = Left $ fromString msg
 
 instance ToJSON TxBuilder where
-  toJSON (TxBuilder selections inputs refInputs outputs collaterals validityStart validityEnd mintData signatures fee defaultChangeAddr metadata) =
+  toJSON (TxBuilder selections inputs refInputs outputs collaterals validityStart validityEnd mintData signatures fee defaultChangeAddr metadata collateralReturnAddr) =
       -- TODO: tojson for input reference
     A.object $ nonEmpyPair
 
@@ -208,7 +210,8 @@ instance ToJSON TxBuilder where
               <+>  "signatures"     >= signatures
               <+>  "fee"            >= fee
               <+>  "changeAddress"  >= defaultChangeAddr
-              <#>  "metadata"       >= metadata
+              <+>  "metadata"       >= metadata
+              <#>  "collateralReturnAddr"       >= collateralReturnAddr
 
     infixl 8 >=
     (>=) a b = appendNonEmpty a b

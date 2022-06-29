@@ -128,11 +128,12 @@ data TxBuilder=TxBuilder{
     txSignatures :: [TxSignature],
     txFee :: Maybe Integer,
     txDefaultChangeAddr :: Maybe (AddressInEra BabbageEra),
-    txMetadata :: Map Word64 Aeson.Value
+    txMetadata :: Map Word64 Aeson.Value,
+    txcollateralReturnAddr :: Maybe (AddressInEra BabbageEra)
   } deriving (Show)
 
 instance Monoid TxBuilder where
-  mempty = TxBuilder  [] [] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty
+  mempty = TxBuilder  [] [] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 instance Semigroup TxBuilder where
   (<>)  txb1 txb2 =TxBuilder{
@@ -161,7 +162,10 @@ instance Semigroup TxBuilder where
     txDefaultChangeAddr = case txDefaultChangeAddr txb1 of
       Just addr -> Just addr
       _ -> txDefaultChangeAddr txb2,
-    txMetadata = txMetadata txb1 <> txMetadata txb2
+    txMetadata = txMetadata txb1 <> txMetadata txb2,
+    txcollateralReturnAddr = case txcollateralReturnAddr txb1 of
+      Just addr -> Just addr
+      _ -> txcollateralReturnAddr txb2
   }
 
 
@@ -170,44 +174,52 @@ data TxContext = TxContext {
   ctxBuiler :: [TxBuilder]
 }
 
+txChangeAddress :: AddressInEra BabbageEra -> TxBuilder 
+txChangeAddress v = TxBuilder  [] [] [] [] [] Nothing Nothing [] [] Nothing (Just v) Map.empty Nothing
+
+
 txSelection :: TxInputSelection -> TxBuilder
-txSelection v = TxBuilder  [v] [] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty
+txSelection v = TxBuilder  [v] [] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 txInput :: TxInput -> TxBuilder
-txInput v = TxBuilder  [] [v] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty
+txInput v = TxBuilder  [] [v] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 txInputReference :: TxInputReference -> TxBuilder
-txInputReference v = TxBuilder  [] [] [v] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty
+txInputReference v = TxBuilder  [] [] [v] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 
 txMints :: [TxMintData] -> TxBuilder
-txMints md= TxBuilder  [] [] [] [] [] Nothing Nothing md [] Nothing Nothing Map.empty
+txMints md= TxBuilder  [] [] [] [] [] Nothing Nothing md [] Nothing Nothing Map.empty Nothing
 
 txOutput :: TxOutput -> TxBuilder
-txOutput v =  TxBuilder  [] [] [] [v] [] Nothing Nothing [] [] Nothing Nothing Map.empty
+txOutput v =  TxBuilder  [] [] [] [v] [] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 txCollateral :: TxCollateral -> TxBuilder
-txCollateral v =  TxBuilder  [] [] [] [] [v] Nothing Nothing [] [] Nothing Nothing Map.empty
+txCollateral v =  TxBuilder  [] [] [] [] [v] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 txSignature :: TxSignature -> TxBuilder
-txSignature v =  TxBuilder  [] [] [] [] [] Nothing Nothing [] [v] Nothing Nothing Map.empty
+txSignature v =  TxBuilder  [] [] [] [] [] Nothing Nothing [] [v] Nothing Nothing Map.empty Nothing
 
 
+txAddTxInCollateral :: TxIn -> TxBuilder
+txAddTxInCollateral v =  TxBuilder  [] [] [] [] [TxCollateralTxin v] Nothing Nothing [] [] Nothing Nothing Map.empty Nothing
 
 -- Transaction validity
 
 -- Set validity Start and end time in posixMilliseconds
 txValidPosixTimeRangeMs :: Integer -> Integer -> TxBuilder
-txValidPosixTimeRangeMs start end = TxBuilder  [] [] [] [] [] (Just start) (Just end) [] [] Nothing Nothing Map.empty
+txValidPosixTimeRangeMs start end = TxBuilder  [] [] [] [] [] (Just start) (Just end) [] [] Nothing Nothing Map.empty Nothing
 
 -- set  validity statart time in posixMilliseconds
 txValidFromPosixMs:: Integer -> TxBuilder
-txValidFromPosixMs start =  TxBuilder  [] [] [] [] [] (Just start) Nothing [] [] Nothing Nothing Map.empty
+txValidFromPosixMs start =  TxBuilder  [] [] [] [] [] (Just start) Nothing [] [] Nothing Nothing Map.empty Nothing
 
 -- set transaction validity end time in posixMilliseconds
 txValidUntilPosixMs :: Integer -> TxBuilder
-txValidUntilPosixMs end =  TxBuilder  [] [] [] [] [] Nothing (Just end) [] [] Nothing Nothing Map.empty
+txValidUntilPosixMs end =  TxBuilder  [] [] [] [] [] Nothing (Just end) [] [] Nothing Nothing Map.empty Nothing
 
+txcollateralReturnAddress :: AddressInEra BabbageEra -> TxBuilder
+txcollateralReturnAddress addr =  TxBuilder  [] [] [] [] [] Nothing Nothing [] [] Nothing Nothing Map.empty (Just addr)
 --- minting
 txMint  v = txMints [v]
 
