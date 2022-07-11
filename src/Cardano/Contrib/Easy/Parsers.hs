@@ -43,8 +43,8 @@ parseAssetId policyText nameText= do
             let policyId=   deserialiseFromRawBytesHex AsPolicyId  $ encodeUtf8 policyText
             let assetName=  deserialiseFromRawBytes AsAssetName $  encodeUtf8 nameText
             case policyId of
-              Nothing -> fail "ParseError: invalid policyId value"
-              Just pi -> case assetName of
+              Left err -> fail "ParseError: invalid policyId value"
+              Right pi -> case assetName of
                 Nothing -> fail "ParseError: invalid tokenName"
                 Just an -> pure $ AssetId pi an
 
