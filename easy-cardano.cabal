@@ -48,6 +48,7 @@ library
     , text-conversions
     , cardano-api
     , cardano-ledger-alonzo
+    , cardano-ledger-babbage
     , cardano-ledger-shelley
     , cardano-slotting
 --    , shelley-spec-ledger
