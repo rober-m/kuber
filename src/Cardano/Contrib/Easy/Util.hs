@@ -276,5 +276,5 @@ toPlutusAssetClass AdaAssetId  =AssetClass (CurrencySymbol $ fromString "", Toke
 utxoValueSum :: UTxO AlonzoEra  -> Value
 utxoValueSum (UTxO uMap)= foldMap toValue $ Map.elems uMap
   where
-    toValue (TxOut _ val _)= case val of
+    toValue (TxOut _ val _ _)= case val of
       TxOutValue masie va -> va

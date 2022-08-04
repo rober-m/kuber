@@ -272,27 +272,28 @@ mkTxWithChange networkCtx (TxOperationBuilder change input output signature oPco
           unresolved=fst all
           vs=map toInput inputs
     mappedOpCollateral  =   map (\(TxInCollateral _in) -> _in) oPcollaterals
-    txOutValue (TxOut _ v _) = case v of
+    txOutValue (TxOut _ v _ _) = case v of
       TxOutAdaOnly oasie lo -> lovelaceToValue lo
       TxOutValue masie va -> va
 
     toInput ( inCtx ::TxCtxInput)= case inCtx of
       UtxoCtxIn (UTxO mp) -> Right $  map (\item-> (item,(fst item,BuildTxWith $ KeyWitness KeyWitnessForSpending)))   (Map.toList mp)
       TxInCtxIn ti -> Left (ti,BuildTxWith $ KeyWitness KeyWitnessForSpending)
-      ScriptCtxTxIn (script,_data,_redeemer,txin) -> Left (txin,BuildTxWith $  ScriptWitness ScriptWitnessForSpending $ plutusWitness script _data _redeemer defaultExunits)
-      ScriptUtxoCtxTxIn (script, _data,_redeemer,UTxO mp) -> Right $ map (\item-> (item,(fst  item,BuildTxWith $  ScriptWitness ScriptWitnessForSpending $ plutusWitness script _data _redeemer defaultExunits)))  (Map.toList mp)
+      ScriptCtxTxIn (script,_data,_redeemer,txin) -> Left (txin,BuildTxWith $  ScriptWitness ScriptWitnessForSpending $ plutusWitness (PScript script) _data _redeemer defaultExunits)
+      ScriptUtxoCtxTxIn (script, _data,_redeemer,UTxO mp) -> Right $ map (\item-> (item,(fst  item,BuildTxWith $  ScriptWitness ScriptWitnessForSpending $ plutusWitness (PScript script) _data _redeemer defaultExunits)))  (Map.toList mp)
 
     toOuotput network (outCtx :: TxCtxOutput) =  do
       case outCtx of
-        AddrCtxOut (addr,value) -> pure $ TxOut addr (TxOutValue MultiAssetInAlonzoEra value) TxOutDatumNone
-        ScriptCtxOut (script,value,dataHash) -> pure $ TxOut (makeShelleyAddressInEra network (PaymentCredentialByScript  $  hashScript   (PlutusScript PlutusScriptV1   script)) NoStakeAddress) (TxOutValue MultiAssetInAlonzoEra  value ) (TxOutDatumHash ScriptDataInAlonzoEra dataHash)
+        AddrCtxOut (addr,value) -> pure $ TxOut addr (TxOutValue MultiAssetInAlonzoEra value) TxOutDatumNone ReferenceScriptNone
+        ScriptCtxOut (script,value,dataHash) -> pure $ TxOut (makeShelleyAddressInEra network (PaymentCredentialByScript  $  hashScript   (PlutusScript PlutusScriptV1   script)) NoStakeAddress) (TxOutValue MultiAssetInAlonzoEra  value ) (TxOutDatumHash ScriptDataInAlonzoEra dataHash) ReferenceScriptNone
         PkhCtxOut (pkh,value)-> case pkhToMaybeAddr network pkh of
           Nothing -> throw $ SomeError "PubKeyHash couldn't be converted to address"
-          Just aie -> pure $ TxOut aie (TxOutValue MultiAssetInAlonzoEra value) TxOutDatumNone
+          Just aie -> pure $ TxOut aie (TxOutValue MultiAssetInAlonzoEra value) TxOutDatumNone ReferenceScriptNone
     mkBody ins outs collateral pParam =
           (TxBodyContent {
             txIns=ins ,
             txInsCollateral=collateral,
+            txInsReference = TxInsReferenceNone,
             txOuts=outs,
             txFee=TxFeeExplicit TxFeesExplicitInAlonzoEra $ Lovelace 1000000,
             -- txValidityRange = (
@@ -316,7 +317,9 @@ mkTxWithChange networkCtx (TxOperationBuilder change input output signature oPco
             txCertificates=TxCertificatesNone,
             txUpdateProposal=TxUpdateProposalNone,
             txMintValue=TxMintNone,
-            txScriptValidity=TxScriptValidityNone
+            txScriptValidity=TxScriptValidityNone,
+            txReturnCollateral = TxReturnCollateralNone,
+            txTotalCollateral = TxTotalCollateralNone
           })
     plutusWitness script _data redeemer exUnits = PlutusScriptWitness PlutusScriptV1InAlonzo
                             PlutusScriptV1
@@ -324,8 +327,8 @@ mkTxWithChange networkCtx (TxOperationBuilder change input output signature oPco
                             (ScriptDatumForTxIn _data) -- script data
                             redeemer -- script redeemer
                             exUnits
-    defaultExunits=ExecutionUnits {executionSteps= 6000000000, executionMemory=14000000}
-    isOnlyAdaTxOut (TxOut a v d) = case v of
+    defaultExunits=ExecutionUnits {executionSteps= 10000000000, executionMemory=10000000}    
+    isOnlyAdaTxOut (TxOut a v d _) = case v of
                                         -- only ada then it's ok
                                         TxOutAdaOnly oasie (Lovelace lo) -> lo>=2500000
                                         -- make sure that it has only one asset and that one is ada asset.
@@ -426,11 +429,11 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
   -- - then the ones with lower lovelace amount come
   -- - then the ones with higher lovelace amount come
   sortingFunc :: (TxIn,TxOut CtxUTxO AlonzoEra) -> (TxIn,TxOut CtxUTxO AlonzoEra)-> Ordering
-  sortingFunc (_,TxOut _ (TxOutAdaOnly _ v1) _) (_, TxOut _ (TxOutAdaOnly _ v2)  _) = v1 `compare` v2
-  sortingFunc (_,TxOut _ (TxOutAdaOnly _ (Lovelace v))  _) (_, TxOut _ (TxOutValue _ v2) _) = LT 
-  sortingFunc (_,TxOut _ (TxOutValue _ v1) _) (_, TxOut _ (TxOutAdaOnly _ v2) _) =  GT
-  sortingFunc (_,TxOut _ (TxOutValue _ v1) _) (_, TxOut _ (TxOutValue _ v2) _) =  let l1= length ( valueToList v1)
-                                                                                      l2= length (valueToList v2) in
+  sortingFunc (_,TxOut _ (TxOutAdaOnly _ v1) _ _) (_, TxOut _ (TxOutAdaOnly _ v2)  _ _) = v1 `compare` v2
+  sortingFunc (_,TxOut _ (TxOutAdaOnly _ (Lovelace v))  _ _) (_, TxOut _ (TxOutValue _ v2) _ _) = LT 
+  sortingFunc (_,TxOut _ (TxOutValue _ v1) _ _) (_, TxOut _ (TxOutAdaOnly _ v2) _ _) =  GT
+  sortingFunc (_,TxOut _ (TxOutValue _ v1) _ _) (_, TxOut _ (TxOutValue _ v2) _ _) =  let l1= length ( valueToList v1)
+                                                                                          l2= length (valueToList v2) in
                                                                                   if l1==l2
                                                                                     then selectAsset v1 AdaAssetId `compare` selectAsset v2  AdaAssetId
                                                                                     else l2 `compare` l1
@@ -466,12 +469,12 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
       existingLove = case  selectAsset (snd  matched) AdaAssetId   of
         Quantity n -> n
       --minimun Lovelace required in the change utxo
-      minLove = case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone of
+      minLove = case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone ReferenceScriptNone of
           Lovelace l -> l
       -- extra lovelace in this txout over the txoutMinLovelace
       extraLove txout = selectLove - minLoveInThisTxout
           where
-            minLoveInThisTxout=case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra $ val <>change) TxOutDatumNone of
+            minLoveInThisTxout=case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra $ val <>change) TxOutDatumNone ReferenceScriptNone of
                 Lovelace l -> l
             val= txOutValueToValue $ txOutValue txout
             selectLove = case selectAsset val AdaAssetId of { Quantity n -> n }
@@ -481,7 +484,7 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
       existingLove = case  selectAsset change AdaAssetId   of
         Quantity n -> n
       --minimun Lovelace required in the change utxo
-      minLove = case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone of
+      minLove = case  f $ TxOut walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone ReferenceScriptNone of
           Lovelace l -> l
 
 
@@ -511,22 +514,22 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
       TxOutAdaOnly _ l -> lovelaceToValue l
       TxOutValue _ v -> v
 
-  txOutValue (TxOut _ v _) = v
+  txOutValue (TxOut _ v _ _) = v
 
   -- modify the outputs to make sure that the min ada is included in them if it only contains asset.
   modifiedOuts calculator = map (includeMin calculator) (txOuts  txbody)
-  includeMin calculator txOut= do case txOut of {TxOut addr v hash-> case v of
+  includeMin calculator txOut= do case txOut of {TxOut addr v hash rf-> case v of
                                      TxOutAdaOnly oasie lo ->  txOut
                                      TxOutValue masie va ->
                                        if selectAsset va AdaAssetId == Quantity  0
-                                       then performMinCalculation addr va hash
+                                       then performMinCalculation addr va hash rf
                                        else  txOut }
     where
-      performMinCalculation addr val hash =TxOut  addr (TxOutValue MultiAssetInAlonzoEra  (val <> lovelaceToValue minLovelace)) hash
+      performMinCalculation addr val hash rf =TxOut  addr (TxOutValue MultiAssetInAlonzoEra  (val <> lovelaceToValue minLovelace)) hash rf
         where
-         minLovelace = minval addr (val <> lovelaceToValue (Lovelace 1_000_000)) hash
+         minLovelace = minval addr (val <> lovelaceToValue (Lovelace 1_000_000)) hash rf
 
-      minval add v hash= calculator (TxOut add (TxOutValue MultiAssetInAlonzoEra v) hash )
+      minval add v hash rf = calculator (TxOut add (TxOutValue MultiAssetInAlonzoEra v) hash rf )
 
   modifiedBody initialOuts txins change fee= content
     where
@@ -536,13 +539,15 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
           ordered=   Set.toList $  Set.fromList (map (toShelleyTxIn . fst) txIns)
           mapped= Map.fromList txIns
           forceJust (Just a) = a
+          forceJust Nothing = error "Error force just encountered Nothing."
 
       content=(TxBodyContent  {
             txIns= reorderInputs$ txins ++ txIns txbody,
             txInsCollateral=txInsCollateral txbody,
+            txInsReference = txInsReference txbody,
             txOuts=  if nullValue change
                   then initialOuts
-                  else initialOuts ++ [ TxOut  walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone]  ,
+                  else initialOuts ++ [ TxOut  walletAddr (TxOutValue MultiAssetInAlonzoEra change) TxOutDatumNone ReferenceScriptNone]  ,
             txFee=TxFeeExplicit TxFeesExplicitInAlonzoEra  fee,
             -- txValidityRange=(TxValidityNoLowerBound,TxValidityNoUpperBound ValidityNoUpperBoundInAlonzoEra),
             txValidityRange = txValidityRange txbody,
@@ -554,7 +559,9 @@ mkBalancedBody  pParams (UTxO utxoMap)  txbody inputSum walletAddr signatureCoun
             txCertificates=txCertificates txbody,
             txUpdateProposal=txUpdateProposal txbody,
             txMintValue=txMintValue txbody,
-            txScriptValidity=txScriptValidity txbody
+            txScriptValidity=txScriptValidity txbody,
+            txReturnCollateral =txReturnCollateral txbody,
+            txTotalCollateral = txTotalCollateral txbody
           })
 
 
