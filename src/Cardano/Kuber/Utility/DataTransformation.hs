@@ -12,10 +12,9 @@ import qualified Cardano.Binary as Cborg
 import Cardano.Ledger.Shelley.API (Credential(KeyHashObj, ScriptHashObj), StakeReference (StakeRefNull, StakeRefBase, StakeRefPtr), ScriptHash (ScriptHash), Ptr (Ptr))
 import Plutus.V1.Ledger.Value (AssetClass (AssetClass))
 import Data.String (fromString)
-import Cardano.Ledger.Alonzo.TxInfo (transKeyHash)
 import qualified Plutus.V2.Ledger.Api as Plutus
 import qualified Cardano.Ledger.Shelley.API as Shelley
-import qualified Cardano.Ledger.Alonzo.TxInfo as Alonzo
+import qualified Cardano.Ledger.Alonzo.TxInfo as Babbage
 import qualified Cardano.Ledger.BaseTypes  as Ledger
 import qualified Cardano.Ledger.Keys as Ledger
 import qualified Cardano.Ledger.Credential as Ledger
@@ -31,8 +30,8 @@ skeyToAddr skey network =
   where
     credential=PaymentCredentialByKey  $ verificationKeyHash   $ getVerificationKey  skey
 
--- Create enterprise  (AddressInEra AlonzoEra) datastructure
-skeyToAddrInEra ::  SigningKey PaymentKey -> NetworkId -> AddressInEra AlonzoEra
+-- Create enterprise  (AddressInEra BabbageEra) datastructure
+skeyToAddrInEra ::  SigningKey PaymentKey -> NetworkId -> AddressInEra BabbageEra
 skeyToAddrInEra skey network=makeShelleyAddressInEra network   credential NoStakeAddress
   where
     credential=PaymentCredentialByKey  $ verificationKeyHash   $ getVerificationKey  skey
@@ -53,7 +52,7 @@ pkhToPaymentKeyHash pkh = deserialiseFromRawBytes (AsHash AsPaymentKey) $ fromBu
 skeyToPaymentKeyHash :: SigningKey PaymentKey -> Hash PaymentKey
 skeyToPaymentKeyHash skey = verificationKeyHash   $ getVerificationKey  skey
 
-addressInEraToPaymentKeyHash :: AddressInEra AlonzoEra -> Maybe (Hash PaymentKey)
+addressInEraToPaymentKeyHash :: AddressInEra BabbageEra -> Maybe (Hash PaymentKey)
 addressInEraToPaymentKeyHash a = case a of { AddressInEra atie ad -> case ad of
                                                ByronAddress ad' -> Nothing
                                                ShelleyAddress net cre sr -> case fromShelleyPaymentCredential cre of
@@ -64,7 +63,7 @@ addressInEraToPaymentKeyHash a = case a of { AddressInEra atie ad -> case ad of
 -- convert PubKeyhash to corresponding Enterprise address. 
 -- Note that the transformation  Address <-> Pkh is not symmetrical for all addresses
 -- It's symmetrical for Enterprise addresses (because enterprise addresses have no stake Key in it)
-pkhToMaybeAddr:: NetworkId -> PubKeyHash -> Maybe (AddressInEra  AlonzoEra)
+pkhToMaybeAddr:: NetworkId -> PubKeyHash -> Maybe (AddressInEra  BabbageEra)
 pkhToMaybeAddr network (PubKeyHash pkh) =do
     key <- vKey
     Just $ makeShelleyAddressInEra  network (PaymentCredentialByKey key)  NoStakeAddress
@@ -93,7 +92,7 @@ addrInEraToPkh a = case a of { AddressInEra atie ad -> case ad of
 
 -- convert the address to Enterprise Address. 
 -- Enterprise address is an address having no stakeKey
-unstakeAddr :: AddressInEra AlonzoEra -> AddressInEra AlonzoEra
+unstakeAddr :: AddressInEra BabbageEra -> AddressInEra BabbageEra
 unstakeAddr a = case a of { AddressInEra atie ad -> case ad of
                                       ByronAddress ad' ->a
                                       ShelleyAddress net cre sr ->  shelleyAddressInEra $ ShelleyAddress net cre StakeRefNull }
@@ -110,10 +109,10 @@ toPlutusAssetClass AdaAssetId  =AssetClass (CurrencySymbol $ fromString "", Toke
 dataToScriptData :: (ToData a1) => a1 -> ScriptData
 dataToScriptData sData =  fromPlutusData $ toData sData
 
-toPlutusScriptHash = Alonzo.transScriptHash 
+toPlutusScriptHash = Babbage.transScriptHash 
 
 toPlutusCredential :: Credential keyrole crypto -> Plutus.Credential
-toPlutusCredential  = Alonzo.transCred
+toPlutusCredential  = Babbage.transCred
 
 
 addressToPlutusCredential :: Cardano.Api.Shelley.Address ShelleyAddr -> Plutus.Credential
@@ -123,19 +122,19 @@ addressToPlutusCredential (ShelleyAddress net cre sr) = toPlutusCredential cre
 -- shelleyPayAddrToPlutusPubKHash (ShelleyAddress _ payCred _) =
 --   case payCred of
 --     Shelley.ScriptHashObj _ -> Nothing
---     Shelley.KeyHashObj kHash -> Just $ Alonzo.transKeyHash kHash
+--     Shelley.KeyHashObj kHash -> Just $ Babbage.transKeyHash kHash
 
--- toPlutusAddress :: AddressInEra AlonzoEra ->  Plutus.Address
+-- toPlutusAddress :: AddressInEra BabbageEra ->  Plutus.Address
 
 toPlutusAddress :: Address ShelleyAddr -> Plutus.Address
-toPlutusAddress (ShelleyAddress net cre sr) =Plutus.Address  (toPlutusCredential cre) (Alonzo.transStakeReference  sr)
+toPlutusAddress (ShelleyAddress net cre sr) =Plutus.Address  (toPlutusCredential cre) (Babbage.transStakeReference  sr)
 
 
 
 addrInEraToPlutusAddress :: AddressInEra era -> Plutus.Address
 addrInEraToPlutusAddress addr = case addr of { AddressInEra atie ad -> case ad of
                                         ByronAddress ad' -> error "addrInEraToPlutusAddress(): got byron address"
-                                        ShelleyAddress net cre sr ->  Plutus.Address (toPlutusCredential cre) (Alonzo.transStakeReference  sr)   }
+                                        ShelleyAddress net cre sr ->  Plutus.Address (toPlutusCredential cre) (Babbage.transStakeReference  sr)   }
 
 fromPlutusAddress :: NetworkId -> Plutus.Address -> Maybe (Address ShelleyAddr)
 fromPlutusAddress network (Plutus.Address cre m_sc) = makeShelleyAddress network <$> paymentCre <*> stakingCre

@@ -10,10 +10,10 @@ import GHC.Real
 import Data.List
 import qualified Data.Set as Set
 import Control.Monad (join)
-import qualified Cardano.Ledger.Alonzo.Tx as LedgerBody
+import qualified Cardano.Ledger.Babbage.Tx as LedgerBody
 import qualified Data.Text as T
--- import Cardano.Ledger.Alonzo.TxBody (ppTxBody)
--- import Cardano.Ledger.Alonzo.Scripts (ppScript)
+-- import Cardano.Ledger.Babbage.TxBody (ppTxBody)
+-- import Cardano.Ledger.Babbage.Scripts (ppScript)
 -- import qualified Shelley.Spec.Ledger.TxBody as LedgerBody (TxIn (TxIn))
 class ConsoleWritable v where
   -- ^ toConsoleText prefix -> object -> Printable text

@@ -85,7 +85,7 @@ instance FromJSON TxMintData where
     exUnitsM <- v .:? "executionUnits"
     mintScript <- case mintRedeemer of
       Nothing -> do
-        case validateScriptSupportedInEra' AlonzoEra scriptAny of
+        case validateScriptSupportedInEra' BabbageEra scriptAny of
           Left fe -> throw fe
           Right (ScriptInEra langInEra script') -> case script' of
             SimpleScript ssv ss -> pure $ TxSimpleScript scriptAny
@@ -129,9 +129,9 @@ instance FromJSON TxMintData where
         _ -> fail "Error amount value must be in integer"
 
 
-      getPolicyIdFromScriptWitness :: ScriptWitness WitCtxMint  AlonzoEra  -> PolicyId
+      getPolicyIdFromScriptWitness :: ScriptWitness WitCtxMint  BabbageEra  -> PolicyId
       getPolicyIdFromScriptWitness witness = case scriptWitnessScript witness of
-        Nothing -> error "Unexpected in era Alonzo or soemthing"
+        Nothing -> error "Unexpected in era Babbage or soemthing"
         Just (ScriptInEra _ script) -> scriptPolicyId  script
 
 
@@ -364,7 +364,7 @@ instance FromJSON TxInputSelection where
 
     -- if "addr" `T.isPrefixOf` s
     --   then do
-    --     case deserialiseAddress (AsAddressInEra AsAlonzoEra) s of
+    --     case deserialiseAddress (AsAddressInEra AsBabbageEra) s of
     --       Nothing -> fail $ "Invalid address string: " ++ T.unpack s
     --       Just aie -> pure $ TxSelectableAddresses [aie]
     --   else do
@@ -500,7 +500,7 @@ instance FromJSON TxOutput where
 -- instance FromJSON TxOutputContent where
 --   parseJSON (A.Object v) = do
 --     addressText <- v .: "address"
---     address <- case deserialiseAddress (AsAddressInEra AsAlonzoEra) addressText of
+--     address <- case deserialiseAddress (AsAddressInEra AsBabbageEra) addressText of
 --       Nothing -> fail $ "Invalid address string: " ++ T.unpack addressText
 --       Just aie -> pure aie
 

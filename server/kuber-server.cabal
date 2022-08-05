@@ -41,6 +41,7 @@ library
     , cardano-ledger-core
     , cardano-ledger-shelley
     , cardano-ledger-alonzo
+    , cardano-ledger-babbage
     , text
     , bytestring
     , containers

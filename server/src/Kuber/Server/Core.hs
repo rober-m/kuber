@@ -14,13 +14,11 @@ import Cardano.Kuber.Api
 import Cardano.Kuber.Util
 import System.Environment (getEnv)
 import System.FilePath (joinPath)
-import Cardano.Ledger.Alonzo.Scripts (ExUnits(ExUnits))
 import Data.Text.Conversions (Base16(Base16), convertText)
 import Cardano.Api.Shelley (TxBody(ShelleyTxBody), fromShelleyTxIn)
 import Cardano.Ledger.Shelley.API (TxBody(_inputs))
 import qualified Cardano.Ledger.TxIn as Ledger
 import qualified Cardano.Ledger.Core as Ledger
-import Cardano.Ledger.Alonzo.TxBody (inputs')
 import qualified Data.Map as Map
 import Data.Text (Text)
 import Cardano.Kuber.Data.Models
@@ -90,6 +88,6 @@ evaluateExecutionUnits' :: DetailedChainInfo ->  String -> IO [Either String Exe
 evaluateExecutionUnits' dcinfo  txStr = do
       case convertText txStr of
         Nothing -> fail "Tx string is not hex encoded"
-        Just (Base16 bs) -> case deserialiseFromCBOR (AsTx AsAlonzoEra ) bs of
+        Just (Base16 bs) -> case deserialiseFromCBOR (AsTx AsBabbageEra ) bs of
           Left  e -> fail $ "Tx string: Invalid CBOR format : "++ show e
           Right tx -> evaluateExecutionUnits dcinfo  tx
