@@ -58,15 +58,15 @@ data TxMintingScript = TxSimpleScript ScriptInAnyLang
 
 newtype TxValidatorScript = TxValidatorScript ScriptInAnyLang deriving (Show)
 
-data TxInputResolved_ = TxInputUtxo (UTxO BabbageEra)
-              | TxInputScriptUtxo TxValidatorScript (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) (UTxO BabbageEra)
-              | TxInputReferenceScriptUtxo TxIn (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) (UTxO BabbageEra)
+data TxInputResolved_ = TxInputUtxo (UTxO AlonzoEra)
+              | TxInputScriptUtxo TxValidatorScript (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) (UTxO AlonzoEra)
+              | TxInputReferenceScriptUtxo TxIn (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) (UTxO AlonzoEra)
 
               deriving (Show)
 
 
 data TxInputUnResolved_ = TxInputTxin TxIn
-              | TxInputAddr (AddressInEra BabbageEra)
+              | TxInputAddr (AddressInEra AlonzoEra)
               | TxInputScriptTxin TxValidatorScript (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) TxIn
               | TxInputReferenceScriptTxin TxIn (Maybe ScriptData) ScriptData (Maybe ExecutionUnits) TxIn
 
@@ -77,10 +77,10 @@ data TxInput  = TxInputResolved TxInputResolved_ | TxInputUnResolved TxInputUnRe
 newtype TxInputReference  = TxInputReference TxIn deriving (Show)
 
 data TxOutputContent =
-     TxOutAddress (AddressInEra BabbageEra) Value
-  |  TxOutAddressWithReference (AddressInEra BabbageEra) Value TxValidatorScript
-  |  TxOutScriptAddress (AddressInEra BabbageEra) Value (Hash ScriptData)
-  |  TxOutScriptAddressWithData (AddressInEra BabbageEra) Value   ScriptData
+     TxOutAddress (AddressInEra AlonzoEra) Value
+  |  TxOutAddressWithReference (AddressInEra AlonzoEra) Value TxValidatorScript
+  |  TxOutScriptAddress (AddressInEra AlonzoEra) Value (Hash ScriptData)
+  |  TxOutScriptAddressWithData (AddressInEra AlonzoEra) Value   ScriptData
   |  TxOutPkh PubKeyHash Value
   |  TxOutScript TxValidatorScript Value  (Hash ScriptData)
   |  TxOutScriptWithData TxValidatorScript Value ScriptData deriving (Show)
@@ -92,9 +92,9 @@ data TxOutput = TxOutput {
 } deriving (Show)
 
 data TxCollateral =  TxCollateralTxin TxIn
-                  |  TxCollateralUtxo (UTxO BabbageEra) deriving (Show)
+                  |  TxCollateralUtxo (UTxO AlonzoEra) deriving (Show)
 
-data TxSignature =  TxSignatureAddr (AddressInEra BabbageEra)
+data TxSignature =  TxSignatureAddr (AddressInEra AlonzoEra)
                   | TxSignaturePkh PubKeyHash
                   | TxSignatureSkey (SigningKey PaymentKey)
                   deriving (Show)
@@ -102,16 +102,16 @@ data TxSignature =  TxSignatureAddr (AddressInEra BabbageEra)
 
 
 data TxChangeAddr = TxChangeAddrUnset
-                  | TxChangeAddr (AddressInEra BabbageEra) deriving (Show)
+                  | TxChangeAddr (AddressInEra AlonzoEra) deriving (Show)
 
-data TxInputSelection = TxSelectableAddresses [AddressInEra BabbageEra]
-                  | TxSelectableUtxos  (UTxO BabbageEra)
+data TxInputSelection = TxSelectableAddresses [AddressInEra AlonzoEra]
+                  | TxSelectableUtxos  (UTxO AlonzoEra)
                   | TxSelectableTxIn [TxIn]
                   | TxSelectableSkey [SigningKey PaymentKey]
                   deriving(Show)
 
 
-data TxMintData = TxMintData PolicyId (ScriptWitness WitCtxMint BabbageEra) Value deriving (Show)
+data TxMintData = TxMintData PolicyId (ScriptWitness WitCtxMint AlonzoEra) Value deriving (Show)
 
 -- TxBuilder object
 -- It is a semigroup and monoid instance, so it can be constructed using helper function
@@ -127,7 +127,7 @@ data TxBuilder=TxBuilder{
     txMintData :: [TxMintData],
     txSignatures :: [TxSignature],
     txFee :: Maybe Integer,
-    txDefaultChangeAddr :: Maybe (AddressInEra BabbageEra),
+    txDefaultChangeAddr :: Maybe (AddressInEra AlonzoEra),
     txMetadata :: Map Word64 Aeson.Value
   } deriving (Show)
 
@@ -166,7 +166,7 @@ instance Semigroup TxBuilder where
 
 
 data TxContext = TxContext {
-  ctxAvailableUtxo :: UTxO BabbageEra,
+  ctxAvailableUtxo :: UTxO AlonzoEra,
   ctxBuiler :: [TxBuilder]
 }
 
@@ -216,16 +216,16 @@ txMint  v = txMints [v]
 txMintSimpleScript :: SimpleScript SimpleScriptV2   ->   [(AssetName,Integer)] -> TxBuilder
 txMintSimpleScript simpleScript amounts = txMint $ TxMintData policyId  witness (valueFromList  $ map (bimap (AssetId policyId) Quantity )  amounts )
   where
-    witness=   SimpleScriptWitness SimpleScriptV2InBabbage SimpleScriptV2 (SScript simpleScript)
+    witness=   SimpleScriptWitness SimpleScriptV2InAlonzo SimpleScriptV2 (SScript simpleScript)
     script = SimpleScript SimpleScriptV2 simpleScript
     policyId = scriptPolicyId script
 
 
 -- pay to an Address
-txPayTo:: AddressInEra BabbageEra ->Value ->TxBuilder
+txPayTo:: AddressInEra AlonzoEra ->Value ->TxBuilder
 txPayTo addr v=  txOutput $  TxOutput (TxOutAddress  addr v) False False
 
-txPayToWithReference:: Plutus.Script -> AddressInEra BabbageEra ->Value ->TxBuilder
+txPayToWithReference:: Plutus.Script -> AddressInEra AlonzoEra ->Value ->TxBuilder
 txPayToWithReference pScript addr v=  txOutput $  TxOutput (TxOutAddressWithReference addr v (TxValidatorScript (plutusScriptToScriptAny pScript))) False False
 
 -- pay to an Address by pubKeyHash. Note that the resulting address will be an enterprise address
@@ -233,12 +233,12 @@ txPayToPkh:: PubKeyHash  ->Value ->TxBuilder
 txPayToPkh pkh v= txOutput $  TxOutput ( TxOutPkh  pkh  v ) False False
 
 -- pay to Script address
-txPayToScript :: AddressInEra BabbageEra -> Value -> Hash ScriptData -> TxBuilder
+txPayToScript :: AddressInEra AlonzoEra -> Value -> Hash ScriptData -> TxBuilder
 txPayToScript addr v d = txOutput $  TxOutput (TxOutScriptAddress  addr v d) False False
 
---Babbage era functions
+--Alonzo era functions
 -- pay to script Address with datum added to the transaction
-txPayToScriptWithData :: AddressInEra BabbageEra -> Value -> ScriptData -> TxBuilder
+txPayToScriptWithData :: AddressInEra AlonzoEra -> Value -> ScriptData -> TxBuilder
 txPayToScriptWithData addr v d  = txOutput $ TxOutput  (TxOutScriptAddressWithData addr v  d) False False
 
 -- pay to script with reference script attached to the output
@@ -253,7 +253,7 @@ txPayToScriptWithDataAndReference pScript v d  =
 -- input consmptions
 
 -- use Utxo as input in the transaction
-txConsumeUtxos :: UTxO BabbageEra -> TxBuilder
+txConsumeUtxos :: UTxO AlonzoEra -> TxBuilder
 txConsumeUtxos utxo =  txInput $ TxInputResolved $  TxInputUtxo  utxo
 
 -- use the TxIn as input in the transaction
@@ -269,11 +269,11 @@ txReferenceTxIn  v = txInputReference $ TxInputReference v
 
 -- use txIn as input in the transaction
 -- Since TxOut is also given the txIn is not queried from the node.
-txConsumeUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra -> TxBuilder
+txConsumeUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra -> TxBuilder
 txConsumeUtxo tin v =txConsumeUtxos $ UTxO $ Map.singleton tin  v
 
 -- Mark this address as txExtraKeyWitness in the transaction object.
-txSignBy :: AddressInEra BabbageEra -> TxBuilder
+txSignBy :: AddressInEra AlonzoEra -> TxBuilder
 txSignBy  a = txSignature (TxSignatureAddr a)
 
 -- Mark this PublicKeyhash as txExtraKeyWitness in the transaction object.
@@ -295,10 +295,10 @@ txRedeemTxin txin script _data _redeemer = txInput $ TxInputUnResolved $ TxInput
 
 -- Redeem from Script Address.
 -- TxOut is provided so the address and value need not be queried from the caradno-node
-txRedeemUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra -> ScriptInAnyLang  -> ScriptData  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra -> ScriptInAnyLang  -> ScriptData  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemUtxo txin txout script _data _redeemer exUnitsM = txInput $ TxInputResolved $ TxInputScriptUtxo  (  TxValidatorScript $ script)  (Just _data)  _redeemer  exUnitsM $ UTxO $ Map.singleton txin  txout
 
-txRedeemUtxoWithInlineDatum :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra -> ScriptInAnyLang  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemUtxoWithInlineDatum :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra -> ScriptInAnyLang  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemUtxoWithInlineDatum txin txout script _redeemer exUnitsM = txInput $ TxInputResolved $ TxInputScriptUtxo  (TxValidatorScript script)  Nothing _redeemer  exUnitsM $ UTxO $ Map.singleton txin  txout
 
 txRedeemTxinWithInlineDatum :: TxIn  -> ScriptInAnyLang  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
@@ -306,33 +306,33 @@ txRedeemTxinWithInlineDatum txin  script _redeemer exUnitsM = txInput $ TxInputU
 
 type ScriptReferenceTxIn = TxIn
 
-txRedeemUtxoWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra  -> ScriptData ->  ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemUtxoWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra  -> ScriptData ->  ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemUtxoWithReferenceScript scRefTxIn txin txout _data _redeemer exUnitsM = txInput $ TxInputResolved $ TxInputReferenceScriptUtxo scRefTxIn (Just _data) _redeemer exUnitsM (UTxO $ Map.singleton txin  txout)
 
-txRedeemTxinWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra  -> ScriptData ->  ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemTxinWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra  -> ScriptData ->  ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemTxinWithReferenceScript scRefTxIn txin txout _data _redeemer exUnitsM = txInput $ TxInputUnResolved $ TxInputReferenceScriptTxin scRefTxIn (Just _data) _redeemer exUnitsM txin
 
-txRedeemUtxoWithInlineDatumWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemUtxoWithInlineDatumWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemUtxoWithInlineDatumWithReferenceScript scRefTxIn txin txout  _redeemer exUnitsM = txInput $ TxInputResolved $ TxInputReferenceScriptUtxo scRefTxIn Nothing _redeemer exUnitsM (UTxO $ Map.singleton txin  txout)
 
-txRedeemTxinWithInlineDatumWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
+txRedeemTxinWithInlineDatumWithReferenceScript :: ScriptReferenceTxIn ->  TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra  -> ScriptData -> Maybe ExecutionUnits ->TxBuilder
 txRedeemTxinWithInlineDatumWithReferenceScript scRefTxIn txin txout  _redeemer exUnitsM = txInput $ TxInputUnResolved $ TxInputReferenceScriptTxin scRefTxIn Nothing _redeemer exUnitsM txin
 
 
  -- wallet addresses, from which utxos can be spent for balancing the transaction
-txWalletAddresses :: [AddressInEra BabbageEra] -> TxBuilder
+txWalletAddresses :: [AddressInEra AlonzoEra] -> TxBuilder
 txWalletAddresses v = txSelection $ TxSelectableAddresses  v
 
 -- wallet address, from which utxos can be spent  for balancing the transaction
-txWalletAddress :: AddressInEra BabbageEra -> TxBuilder
+txWalletAddress :: AddressInEra AlonzoEra -> TxBuilder
 txWalletAddress v = txWalletAddresses [v]
 
 -- wallet utxos, that can be spent  for balancing the transaction
-txWalletUtxos :: UTxO BabbageEra -> TxBuilder
+txWalletUtxos :: UTxO AlonzoEra -> TxBuilder
 txWalletUtxos v =  txSelection $  TxSelectableUtxos v
 
 -- wallet utxo, that can be spent  for balancing the transaction
-txWalletUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO BabbageEra -> TxBuilder
+txWalletUtxo :: TxIn -> Cardano.Api.Shelley.TxOut CtxUTxO AlonzoEra -> TxBuilder
 txWalletUtxo tin tout = txWalletUtxos $  UTxO $ Map.singleton tin  tout
 
 txWalletSignKey :: SigningKey PaymentKey -> TxBuilder

@@ -9,6 +9,6 @@ main :: IO ()
 main = do
   dcinfo <- chainInfoFromEnv >>= withDetails
 
-  let port=8081
+  let port=8079
   putStrLn $ "Starting server on port " ++ show port ++"..."
   run port $ app dcinfo

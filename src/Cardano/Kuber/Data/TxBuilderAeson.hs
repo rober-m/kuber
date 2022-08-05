@@ -85,7 +85,7 @@ instance FromJSON TxMintData where
     exUnitsM <- v .:? "executionUnits"
     mintScript <- case mintRedeemer of
       Nothing -> do
-        case validateScriptSupportedInEra' BabbageEra scriptAny of
+        case validateScriptSupportedInEra' AlonzoEra scriptAny of
           Left fe -> throw fe
           Right (ScriptInEra langInEra script') -> case script' of
             SimpleScript ssv ss -> pure $ TxSimpleScript scriptAny
@@ -129,9 +129,9 @@ instance FromJSON TxMintData where
         _ -> fail "Error amount value must be in integer"
 
 
-      getPolicyIdFromScriptWitness :: ScriptWitness WitCtxMint  BabbageEra  -> PolicyId
+      getPolicyIdFromScriptWitness :: ScriptWitness WitCtxMint  AlonzoEra  -> PolicyId
       getPolicyIdFromScriptWitness witness = case scriptWitnessScript witness of
-        Nothing -> error "Unexpected in era babbage or soemthing"
+        Nothing -> error "Unexpected in era Alonzo or soemthing"
         Just (ScriptInEra _ script) -> scriptPolicyId  script
 
 
