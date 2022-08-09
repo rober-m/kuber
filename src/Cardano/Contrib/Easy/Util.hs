@@ -39,6 +39,7 @@ import qualified Data.Map as Map
 import Data.Char (toLower)
 import Data.Set (Set)
 import Cardano.Ledger.Shelley.API (Credential(ScriptHashObj, KeyHashObj), KeyHash (KeyHash), StakeReference (StakeRefNull))
+import Text.Read (readMaybe)
 
 localNodeConnInfo :: NetworkId -> FilePath   -> LocalNodeConnectInfo CardanoMode
 localNodeConnInfo = LocalNodeConnectInfo (CardanoModeParams (EpochSlots 21600))
@@ -168,7 +169,7 @@ getNetworkFromEnv envKey =  do
     Right s ->  case map toLower s of
       "mainnet" -> pure  Mainnet
       "testnet" -> pure $ Testnet  (NetworkMagic 1097911063)
-      _  -> case read s of
+      _  -> case readMaybe s of
         Just v -> pure (Testnet  (NetworkMagic v))
         _ -> fail "Invalid network id"
 
