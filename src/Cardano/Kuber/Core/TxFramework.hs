@@ -23,7 +23,7 @@ import Cardano.Kuber.Util
 import Data.Functor ((<&>))
 
 
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, putStrLn)
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Lazy as LBS
@@ -40,7 +40,6 @@ import Cardano.Kuber.Core.TxBuilder
 import Cardano.Kuber.Core.ChainInfo (DetailedChainInfo (DetailedChainInfo, dciConn), ChainInfo (getNetworkId, getConnectInfo, withDetails))
 import Ouroboros.Network.Protocol.LocalStateQuery.Type (AcquireFailure)
 import Cardano.Api.Crypto.Ed25519Bip32 (xPrvFromBytes)
-import Debug.Trace (trace, traceM)
 import qualified Data.Aeson as A
 import GHC.Num (wordToInteger)
 import qualified Data.Map.Strict as StrictMap
@@ -79,6 +78,7 @@ import Cardano.Slotting.EpochInfo (hoistEpochInfo, epochInfoSlotToUTCTime)
 import Ouroboros.Consensus.HardFork.History.EpochInfo (interpreterToEpochInfo)
 import           Control.Monad.Trans.Except(runExcept)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import PlutusTx.Maybe (isNothing)
 
 type BoolChange   = Bool
 type BoolFee = Bool
@@ -310,10 +310,10 @@ txBuilderToTxBody'  dCinfo@(DetailedChainInfo cpw conn pParam ledgerPParam syste
       _ -> False ) _inputs
 
     requiresExUnitCalculation = any (\case
-      TxInputResolved TxInputScriptUtxo {}-> True
-      TxInputResolved TxInputReferenceScriptUtxo{}-> True
-      TxInputUnResolved TxInputScriptTxin{} -> True
-      TxInputUnResolved TxInputReferenceScriptTxin{} -> True
+      TxInputResolved (TxInputScriptUtxo _ _ _ mExUnits _ )  -> isNothing mExUnits
+      TxInputResolved (TxInputReferenceScriptUtxo _ _ _ mExUnits _)-> isNothing mExUnits
+      TxInputUnResolved (TxInputScriptTxin _ _ _ mExUnits _) -> isNothing mExUnits
+      TxInputUnResolved (TxInputReferenceScriptTxin _ _ _ mExUnits _) -> isNothing mExUnits
       _ -> False ) _inputs
 
 
