@@ -564,7 +564,7 @@ const notification = _notification.useNotificationStore();
 export default {
   components:{NetworkSelector},
   editor: null,
-  
+
   created() {
     let counter = 5;
     const __this = this;
@@ -945,7 +945,7 @@ export default {
                 request.selections = availableUtxos;
               }
             }
-              console.log("calling kuber")
+              console.info("calling kuber for network",activeNetwork)
               let url =activeNetwork.value.url
               if(!url && activeNetwork.value.name=='Auto'){
                   const network=await instance.getNetworkId()

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Editor from '@/components/Editor.vue'
+import Ide from '@/components/Ide.vue'
 
 console.log(import.meta.env.BASE_URL)
 
@@ -11,7 +11,7 @@ const router = createRouter({
       // @ts-ignore
       path: '/',
       name: 'home',
-      component: Editor
+      component: Ide
     },
     {
       path: '/kuber',
@@ -19,7 +19,7 @@ const router = createRouter({
       // route level code-splitting
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
-      component: Editor
+      component: Ide
     }
   ]
 })

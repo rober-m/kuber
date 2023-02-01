@@ -163,7 +163,7 @@ export function updateUrl(networkName: NetworkName,url:string){
 export function switchNetwork(networkName: NetworkName){
   console.info("Switching Network:",networkName)
   if(networks[networkName]){
-    activeNetwork=networks[networkName]
+    activeNetwork.value=networks[networkName]
     localStorage.setItem("network",networkName)
   }
 }
