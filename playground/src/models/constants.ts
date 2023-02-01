@@ -114,9 +114,3 @@ export const HaskellCodes = {
 export const DefaultComment =
   "// Auto completion is a testing feature, It maynot always work.";
 
-export const NetworkUrls = {
-  "preview testnet": "https://preview.kuberide.com",
-  "preprod testnet": "https://preprod.kuberide.com",
-  mainnet: "https://mainnet.kuberide.com",
-  localhost: "http://localhost:8081",
-};
